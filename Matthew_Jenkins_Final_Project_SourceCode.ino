@@ -55,7 +55,7 @@ const int stepsPerRevolution = 200;
 Stepper myStepper(stepsPerRevolution, 23, 27, 25, 29);
 dht DHT;
 float temp = 0.0;
-float tempthreshold = 0.0;
+float tempthreshold = 20.0;
 unsigned int currentTicks = 0;
 int ErrorCode = 0;
 const int ISRbuttonPin = 19;
@@ -95,6 +95,8 @@ void setup() {
   myStepper.setSpeed(60);
 }
 
+int x = 0;
+
 void loop() {
   if(buttonPressed){
     if(state == 'd'){
@@ -119,11 +121,16 @@ void loop() {
       lcd.setCursor(0, 0);
       lcd.print("DISABLED!");
      }
+     x = 0;
   } else if (state == 'i'){
      *port_a &= ~(0x01 << 2);
      *port_a &= ~(0x01 << 0);
      *port_a &= ~(0x01 << 4);
-     *port_a &= ~(0x01 << 6);
+     *port_a |= (0x01 << 6);
+     if(x == 0){
+      printTimeStamp();
+      x++;
+     }
      check_temp_and_hum();
      lcdcount = 0;
   } else if (state == 'e'){
@@ -132,11 +139,8 @@ void loop() {
      *port_a &= ~(0x01 << 4);
      *port_a &= ~(0x01 << 6);
      stopdownFan();
-     if(ErrorCode == 1){
-        *port_a |= (0x01 << 6);
-     } else {
-     }
      lcdcount = 0;
+     x = 0;
   } else if (state == 'r'){
      *port_a &= ~(0x01 << 2);
      *port_a &= ~(0x01 << 0);
@@ -145,6 +149,7 @@ void loop() {
      startupFan();
      check_temp_and_hum();
      lcdcount = 0;
+     x = 0;
   }
 
   if (*pin_g & (0x01 << 1)) {
