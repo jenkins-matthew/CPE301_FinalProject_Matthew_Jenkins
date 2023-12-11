@@ -10,23 +10,18 @@
 volatile unsigned char* port_a = (unsigned char*) 0x22;
 volatile unsigned char* ddr_a = (unsigned char*) 0x21;
 volatile unsigned char* pin_a = (unsigned char*) 0x20;
-
 volatile unsigned char* port_b = (unsigned char*) 0x25;
 volatile unsigned char* ddr_b = (unsigned char*) 0x24;
 volatile unsigned char* pin_b = (unsigned char*) 0x23;
-
 volatile unsigned char* port_c = (unsigned char*) 0x28;
 volatile unsigned char* ddr_c = (unsigned char*) 0x25;
 volatile unsigned char* pin_c = (unsigned char*) 0x26;
-
 volatile unsigned char* port_d = (unsigned char*) 0x2B;
 volatile unsigned char* ddr_d = (unsigned char*) 0x2A;
 volatile unsigned char* pin_d = (unsigned char*) 0x29;
-
 volatile unsigned char* port_g = (unsigned char*) 0x34;
 volatile unsigned char* ddr_g = (unsigned char*) 0x33;
 volatile unsigned char* pin_g = (unsigned char*) 0x32;
-
 volatile unsigned char *myTCCR1A = (unsigned char *) 0x80;
 volatile unsigned char *myTCCR1B = (unsigned char *) 0x81;
 volatile unsigned char *myTCCR1C = (unsigned char *) 0x82;
@@ -48,21 +43,19 @@ const int RS = 11, EN = 12, D4 = 2, D5 = 3, D6 = 4, D7 = 5;
 LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 
 //VARIBLES
-char state = 'd'; //where all the states are stored and accessed 'd'- disabled, 'i'- idle, 'r'- running, 'e'- error
-bool statebutton_pressed = false;
-int waterlevel = 0;
-const int stepsPerRevolution = 200; 
-Stepper myStepper(stepsPerRevolution, 23, 27, 25, 29);
-dht DHT;
-float temp = 0.0;
-float tempthreshold = 20.0;
-unsigned int currentTicks = 0;
-int ErrorCode = 0;
-const int ISRbuttonPin = 19;
-volatile bool buttonPressed = false;
-unsigned int lcdcount = 0;
-unsigned char adc = 0;
-RTC_DS1307 rtc;
+char state = 'd'; // where all the states are stored and accessed 'd'- disabled, 'i'- idle, 'r'- running, 'e'- error
+int waterlevel = 0; // used to record current water level
+const int stepsPerRevolution = 200; // stepper motor variable
+Stepper myStepper(stepsPerRevolution, 23, 27, 25, 29); // stepper motor variable
+dht DHT; // temperature sensor and humidity sensor variable
+float temp = 0.0; // used to record current temperature
+float tempthreshold = 20.0; // temperature threshold for fan
+int ErrorCode = 0; // error code variable
+const int ISRbuttonPin = 19; // ISR variable
+volatile bool buttonPressed = false; // ISR variable
+unsigned int lcdcount = 0; // lcd variable
+unsigned char adc = 0; // analog reader variable
+RTC_DS1307 rtc; // real time clock variable
 
 void setup() {
   //leds (R,Y,B,G)
@@ -87,7 +80,6 @@ void setup() {
   *ddr_c |= 0x01 << 5;
   Wire.begin();
   rtc.begin();
-  Serial.begin(9600);
   U0init(9600);
   adc_init();
   lcd.begin(16, 2);
@@ -98,6 +90,7 @@ void setup() {
 int x = 0;
 
 void loop() {
+  // the following if is used to change certain states
   if(buttonPressed){
     if(state == 'd'){
       state = 'i';
@@ -109,6 +102,8 @@ void loop() {
     }
     buttonPressed = false;
   }
+
+  // the following code is where the actual state operations happen
   if(state == 'd'){
      *port_a |= (0x01 << 2);
      *port_a &= ~(0x01 << 0);
@@ -152,6 +147,7 @@ void loop() {
      x = 0;
   }
 
+  //the following code is used to control the stepper motor and direction of the vent
   if (*pin_g & (0x01 << 1)) {
     myStepper.step(stepsPerRevolution);
     printTimeStamp();
@@ -163,23 +159,24 @@ void loop() {
   }
 }
 
+// the following function is where the temperature is recorded as well as humidity value to the lcd screen
 void check_temp_and_hum(){
   int chk = DHT.read11(31);
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Temperature: ");
   lcd.print(DHT.temperature);
-  temp = DHT.temperature;
   lcd.setCursor(0, 1);
   lcd.print("Humidity: ");
   lcd.print(DHT.humidity);
-  //startupFan();
   minDelay(60000);
 }
 
+// the following function is used the one minute delay, also where to system checks for errors and or whether or not to run the fan
 void minDelay(unsigned long milliseconds) {
   unsigned long startTime = millis();
   while ((millis() - startTime) < milliseconds) {
+    temp = DHT.temperature;
     unsigned int waterlevel = adc_read(adc);
     if(temp > tempthreshold && state != 'r'){
       state = 'r';
@@ -215,18 +212,22 @@ void minDelay(unsigned long milliseconds) {
   }
 }
 
+// the following function starts the fan
 void startupFan(){
   *port_c |= (0x01 << 5);
 }
 
+// the following function stops the fan
 void stopdownFan(){
   *port_c &= ~(0x01 << 5);
 }
 
+// the following function is the interupt system
 void buttonISR(){
     buttonPressed = true;
 }
 
+// the following function is used to setup the serial monitor, basic uart function
 void U0init(unsigned long U0baud) {
   unsigned long FCPU = 16000000;
   unsigned int tbaud;
@@ -237,20 +238,26 @@ void U0init(unsigned long U0baud) {
   *myUBRR0 = tbaud;
 }
 
+// basic uart function
 unsigned char U0kbhit()
 {
   return *myUCSR0A & RDA;
 }
+
+// basic uart function
 unsigned char U0getchar()
 {
   return *myUDR0;
 }
+
+// basic uart function
 void U0putchar(unsigned char U0pdata)
 {
   while((*myUCSR0A & TBE)==0);
   *myUDR0 = U0pdata;
 }
 
+// basic analog setup function
 void adc_init()
 {
   *my_ADCSRA |= 0b10000000;
@@ -265,6 +272,7 @@ void adc_init()
   *my_ADMUX  &= 0b11100000; 
 }
 
+// basic analog read function
 unsigned int adc_read(unsigned char adc_channel_num)
 {
   *my_ADMUX  &= 0b11100000;
@@ -280,6 +288,7 @@ unsigned int adc_read(unsigned char adc_channel_num)
   return *my_ADC_DATA;
 }
 
+// the following function print the time stamp on system changes to the serial monitor
 void printTimeStamp() {
   DateTime now = rtc.now();
   char time_stamp[2];
